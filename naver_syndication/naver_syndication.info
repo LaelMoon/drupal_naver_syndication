@@ -1,0 +1,12 @@
+package = SYNDICATION
+name = Naver Syndication Integration
+description = "Publish all public contents to Naver Syndication Service."
+core = 7.x
+version = "7.x-1.0"
+
+files[] = naver_syndication.module
+files[] = naver_syndication.admin.inc
+files[] = naver_syndication.pages.inc
+files[] = naver_syndication.install
+configure = admin/config/services/naver_syndication
+

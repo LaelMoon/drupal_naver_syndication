@@ -1,0 +1,19 @@
+<?php
+
+/**
+ * @file
+ * Install, update and uninstall functions for the module.
+ */
+
+/**
+ * Implements hook_uninstall().
+ */
+function naver_syndication_uninstall() {
+  variable_del('nsyndi_bearer_token_key');
+  variable_del('nsyndi_feed_entries');
+
+  variable_del('nsyndi_lastsent_nid');
+  variable_del('nsyndi_lastsent_datetime');
+
+}
+

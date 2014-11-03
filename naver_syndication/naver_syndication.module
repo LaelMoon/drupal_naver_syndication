@@ -1,0 +1,114 @@
+<?php
+
+/**
+ * Implements hook_menu().
+ */
+function naver_syndication_menu() {
+
+	$items['node/%node/syndication.naver'] = array(
+		'page callback' => 'naver_syndication_node_feed',
+		'page arguments' => array(1),
+		'access arguments' => array('access content'),
+		'type' => MENU_CALLBACK,
+		'file' => 'naver_syndication.pages.inc',
+	);
+
+	$items['admin/config/services/naver_syndication'] = array(
+		'title' => 'Naver Syndication',
+		'description' => 'Configure Syndication Module.',
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array('naver_syndication_settings_form'),
+		'access arguments' => array('administer'),
+		'file' => 'naver_syndication.admin.inc',
+	);
+
+	return $items;
+}
+
+/**
+ * Implements hook_cron().
+ */
+function naver_syndication_cron() {
+
+	if(variable_get('nsyndi_bearer_token_key', '') == '') return;
+
+	$lastsent_nid = variable_get('nsyndi_lastsent_nid', 0);
+	$lastsent_datetime = variable_get('nsyndi_lastsent_datetime', 0);
+
+	$query = db_select('node');
+	$query->addField('node', 'nid');
+	$query->addField('node', 'changed');
+	$query->condition('status', 1);//public
+	$query->condition('changed', $lastsent_datetime, '>=');
+	$query->condition('nid', $lastsent_nid, '<>');
+	$query->orderBy('changed', 'ASC');//old document first
+	$query->range(0, variable_get('nsyndi_feed_entries', 0));
+	$query->addTag('node_access');
+	$nodes = $query->execute()->fetchAll();
+
+	for($i=0;$i<count($nodes);$i++){
+		$ping_auth_header = "Authorization: Bearer ".variable_get('nsyndi_bearer_token_key', '');
+		$ping_url = $GLOBALS['base_url']."/node/".($nodes[$i]->nid)."/syndication.naver";
+		$ping_client_opt = array(
+			CURLOPT_URL => "https://apis.naver.com/crawl/nsyndi/v2",
+			CURLOPT_POST => true,
+			CURLOPT_POSTFIELDS => "ping_url=" . urlencode($ping_url),
+			CURLOPT_RETURNTRANSFER => true,
+			CURLOPT_CONNECTTIMEOUT => 10,
+			CURLOPT_TIMEOUT => 10,
+			CURLOPT_HTTPHEADER => array("Host: apis.naver.com", "Pragma: no-cache", "Accept: */*", $ping_auth_header)
+		);
+		$ping = curl_init();
+		curl_setopt_array($ping, $ping_client_opt);
+		$result = curl_exec($ping);
+		curl_close($ping);
+
+		$result_xml = new SimpleXMLElement($result);
+
+
+		if($result_xml->error_code != '000'){
+			drupal_set_message(t('Naver Syndication Module : Node : %docnum - Error code : %error_code', array('%docnum' => ($nodes[$i]->nid),'%error_code' => $result_xml->message)),'error');
+			//watchdog('Naver Syndication', 'Node : %docnum - Error code : %error_code', array('%docnum' => ($nodes[$i]->nid),'%error_code' => $result_xml->message), WATCHDOG_ERROR);
+			watchdog('Naver Syndication','Something went wrong!',NULL,WATCHDOG_ERROR);
+			break;
+		}
+		else{
+			variable_set('nsyndi_lastsent_nid', ($nodes[$i]->nid));
+			variable_set('nsyndi_lastsent_datetime', ($nodes[$i]->changed));
+
+		}
+
+
+
+	}
+
+
+	if(count($nodes)>0){
+		drupal_set_message(t('Naver Syndication Module : %docnum  document(s) has been sent.', array('%docnum' => count($nodes),'%time' => date_iso8601(time(0)))));
+	}
+
+}
+
+/**
+ * Implements hook_theme().
+ */
+function naver_syndication_theme() {
+  return array(
+    'naver_syndication_feed_item' => array(
+      'variables' => array(
+        'title' => NULL,
+        'link' => NULL,
+        'item' => NULL,
+        'extra' => array(),
+      ),
+      'file' => 'naver_syndication.pages.inc',
+    ),
+    'naver_syndication_feed' => array(
+      'variables' => array(
+        'feed_info' => array(),
+        'items' => '',
+      ),
+      'file' => 'naver_syndication.pages.inc',
+    ),
+  );
+}
