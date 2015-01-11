@@ -1,4 +1,4 @@
 drupal_naver_syndication
 ========================
 
-Drupal 7 module that syndicate NAVER syndication service v2.
+This is Drupal 7 module that syndicate publicly accessible content to "NAVER syndication service v2".
